@@ -1,0 +1,42 @@
+using CSV
+using DataFrames
+using DataFramesMeta
+
+data = CSV.read("/Users/katharinazuehlsdorff/Documents/Cambridge IfN PhD/Partial Reinforcement Learning/Data/rr0/Animal1.csv")
+
+select!(data, Not(1:3))
+rename!(data, [:CR, :CN, :Prem, :Omissions, :Incorrect, :RespLat, :CollLat])
+
+data.Sequence = 0
+
+#=
+Possible actions:
+Nose poke to light & receive reward (NPR = 1)
+Nose pose to light, correct & no reward (NPNR = 2)
+Nose poke to light but incorrect, no reward (NPiNR = 3)
+Nose poke to light but premature, no reward (NPpNR)
+Omission (O = 5)
+=#
+
+#The value in the sequence will be 1 when
+data[data[!, :CR] .== 1,:Sequence] .= Ref(1)
+data[data[!,:CN] .== 1,:Sequence] .= Ref(2)
+data[data[!, :Prem] .== 1,:Sequence] .= Ref(3)
+data[data[!, :Incorrect] .== 1,:Sequence] .= Ref(4)
+data[data[!, :Omissions] .== 1,:Sequence] .= Ref(5)
+
+#response latency for omisssion not included
+#if collection latency 0, interpret as NaN
+#exclude collection latencies for premature, omissions and incorrect
+
+#Two tau values for response latency and collection latency
+TauResp = data
+TauResp[TauResp[!, :Sequence].!=5,:]
+TauResp = TauResp.RespLat
+
+
+TauColl = data
+TauColl[TauColl[!, :Sequence].!= (3,4,5),:]
+TauColl[TauColl[!, :Sequence].!= [4],:]
+TauColl[TauColl[!, :Sequence].!= [5],:]
+TauColl = TauColl.CollLat
