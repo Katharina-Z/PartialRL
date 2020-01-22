@@ -1,0 +1,58 @@
+
+using CSV
+using DataFrames
+using DataFramesMeta
+
+data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Animal1.csv")
+select!(data, Not(1:3))
+rename!(data, [:CR, :CN, :Prem, :Omissions, :Incorrect, :RespLat, :CollLat])
+
+
+#=
+Possible actions:
+Nose poke to light & receive reward (NPR = 1)
+Nose pose to light, correct & no reward (NPNR = 2)
+Nose poke to light but incorrect, no reward (NPiNR = 3)
+Nose poke to light but premature, no reward (NPpNR)
+Omission (O = 5)
+=#
+
+#The value in the sequence will be 1 when
+#data.Sequence = 0
+#data[data[!, :CR] .== 1,:Sequence] .= Ref(1)
+#data[data[!,:CN] .== 1,:Sequence] .= Ref(2)
+#data[data[!, :Prem] .== 1,:Sequence] .= Ref(3)
+#data[data[!, :Incorrect] .== 1,:Sequence] .= Ref(4)
+#data[data[!, :Omissions] .== 1,:Sequence] .= Ref(5)
+
+#response latency for omisssion not included
+#if collection latency 0, interpret as NaN
+#exclude collection latencies for premature, omissions and incorrect
+
+#Two tau values for response latency and collection latency
+TauResp = data.RespLat
+TauColl = data.CollLat
+
+
+data.RewSum = data.CR
+
+data.Tau = data.RespLat + data.CollLat
+
+
+
+for i in data.RewSum
+    data.RewSum[i] = data.RewSum[i] + data.RewSum[i-1]
+    println(i)
+end
+
+
+for i=1:size(data.RewSum)
+    data.RewSum = data.RewSum[i] + data.RewSum[i-1]
+end
+
+
+module CleanData
+
+export TauResp
+
+end
