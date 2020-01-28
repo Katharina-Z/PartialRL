@@ -4,8 +4,9 @@ using DataFrames
 using DataFramesMeta
 
 data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Animal1.csv", copycols=true)
-select!(data, Not(1:3))
-rename!(data, [:CR, :CN, :Prem, :Omissions, :Incorrect, :RespLat, :CollLat])
+select!(data, Not(1))
+select!(data, Not(3))
+rename!(data, [:Reinf ,:CR, :CN, :Prem, :Omissions, :Incorrect, :RespLat, :CollLat])
 
 
 #=
@@ -18,12 +19,12 @@ Omission (O = 5)
 =#
 
 #The value in the sequence will be 1 when
-#data.Sequence = 0
-#data[data[!, :CR] .== 1,:Sequence] .= Ref(1)
-#data[data[!,:CN] .== 1,:Sequence] .= Ref(2)
-#data[data[!, :Prem] .== 1,:Sequence] .= Ref(3)
-#data[data[!, :Incorrect] .== 1,:Sequence] .= Ref(4)
-#data[data[!, :Omissions] .== 1,:Sequence] .= Ref(5)
+data.Action = 0
+data[data[!, :CR] .== 1,:Action] .= Ref(1)
+data[data[!,:CN] .== 1,:Action] .= Ref(2)
+data[data[!, :Prem] .== 1,:Action] .= Ref(3)
+data[data[!, :Incorrect] .== 1,:Action] .= Ref(4)
+data[data[!, :Omissions] .== 1,:Action] .= Ref(5)
 
 #response latency for omisssion not included
 #if collection latency 0, interpret as NaN
@@ -32,12 +33,11 @@ Omission (O = 5)
 data.Tau = data.RespLat + data.CollLat
 
 
-data.RewSum = 0
+data.RewSum = data.CR
 
 for (i,v) in enumerate(data.RewSum)
-    data.RewSum[1] = 0
     if i > 1
-        data.RewSum[i] = data.CR[i] + data.CR[i-1]
+        data.RewSum[i] = data.RewSum[i] + data.RewSum[i-1]
     end
 end
 
@@ -50,14 +50,8 @@ for (i,v) in enumerate(data.TauSum)
     end
 end
 
+data.Reinf = data.Reinf / 100
 
 RewSum = data.RewSum
 TauSum = data.TauSum
-
-
-module CleanData
-
-
-export RewSum, TauSum
-
-end
+Reinf = data.Reinf

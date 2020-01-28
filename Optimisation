@@ -1,33 +1,47 @@
 using JuMP
 using Ipopt
 
-import .CleanData.RewSum
 
-m = Model(with_optimizer(Ipopt.Optimizer))
-
-@variable(m, 0.5 <= Ur <= 1.5)
-@variable(m, 0.1 <= Cu <= 1)
-@variable(m, 0.01 <= Cv <= 0.05)
-@variable(m, 0 <= FutRew <=20)
+module CleanData
+include("CleanData")
+using .CleanData
+export data, RewSum, TauSum, Reinf
+end
 
 
-RewSch = 0.2 #Change depending on schedule
-Tau = 7000 #ms, get from data
-AvRew = 0.05 #reward per ms, calculate for every time point
+function optimise(; verbose = true)
+    RespTau = CleanData.data.RespLat
+    RewSum = CleanData.data.RewSum
+    Reinf = CleanData.data.Reinf[1]
+    TauSum = CleanData.data.TauSum
+    AvRew = 0.05
+    num_trials = length(RespTau)
 
-@variable(m, AvRew)
+    m = Model(with_optimizer(Ipopt.Optimizer))
 
-RewSum = CleanData.RewSum
-AvRew = (RewSum - Cu) / TauSum
+    @variable(m, 0.1 <= Ur[1:num_trials]<= 3)
+    @variable(m, 0.01 <= Cu[1:num_trials] <= 1)
+    @variable(m, 0.01 <= Cv[1:num_trials] <= 1)
+    @variable(m, FutRew[1:num_trials]) #need to figure out what this is
+    avrew = (RewSum - Cu) / TauSum
 
-@NLobjective(m, Max, (RewSch*Ur) - Cu - (Cv/Tau) - (AvRew*Tau) + FutRew )
+    @NLexpression(m, my_expr[i = 1:num_trials], (RewSum[i] - Cu[i]) / TauSum[i])
 
-print(m)
+    @NLconstraint(m, 0 <= sum((Reinf*Ur[i]) - Cu[i] - (Cv[i]/RespTau[i]) - (AvRew*RespTau[i]) + FutRew[i] for i in 1:num_trials) <= 0.99)
+    @NLobjective(m, Max, sum((Reinf*Ur[i]) - Cu[i] - (Cv[i]/RespTau[i]) - (AvRew*RespTau[i]) + FutRew[i] for i in 1:num_trials))
 
-status = optimize!(m)
+    JuMP.optimize!(m)
 
-println("Objective value: ", JuMP.objective_value(m))
-println("Ur = ", JuMP.value(Ur))
-println("Cu = ", JuMP.value(Cu))
-println("Cv = ", JuMP.value(Cv))
-println("FutRew = ", JuMP.value(FutRew))
+    if verbose
+    println("RESULTS:")
+        for i in 1:num_trials
+            println("Objective value: ", JuMP.objective_value(m))
+            println("Ur = ", JuMP.value(Ur))
+            println("Cu = ", JuMP.value(Cu))
+            println("Cv = ", JuMP.value(Cv))
+            println("FutRew = ", JuMP.value(FutRew))
+        end
+    end
+end
+
+optimise(verbose=true)
