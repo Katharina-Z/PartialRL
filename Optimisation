@@ -9,12 +9,12 @@ export data, RewSum, TauSum, Reinf
 end
 
 
-function optimise(; verbose = true)
+
+function optimise_response(; verbose = true)
     RespTau = CleanData.data.RespLat
     RewSum = CleanData.data.RewSum
     Reinf = CleanData.data.Reinf[1]
     TauSum = CleanData.data.TauSum
-    AvRew = 0.05
     num_trials = length(RespTau)
 
     m = Model(with_optimizer(Ipopt.Optimizer))
@@ -22,13 +22,13 @@ function optimise(; verbose = true)
     @variable(m, 0.1 <= Ur[1:num_trials]<= 3)
     @variable(m, 0.01 <= Cu[1:num_trials] <= 1)
     @variable(m, 0.01 <= Cv[1:num_trials] <= 1)
-    @variable(m, FutRew[1:num_trials]) #need to figure out what this is
-    avrew = (RewSum - Cu) / TauSum
+    @variable(m, 1 <= FutRew[1:num_trials] <= 90) #need to figure out what this is
 
-    @NLexpression(m, my_expr[i = 1:num_trials], (RewSum[i] - Cu[i]) / TauSum[i])
+    #@NLconstraint(m, [i = 1:num_trials], 0 <= Reinf*Ur[i] - Cu[i] - (Cv[i]/RespTau[i]) - (((RewSum[i] -Cu[i])/TauSum[i])*RespTau[i]) + FutRew[i] <= 0.99)
+    #@NLobjective(m, Max, (Reinf*Ur[i]) - Cu[i] - (Cv[i]/RespTau[i]) - (((RewSum[i] -Cu[i])/TauSum[i])*RespTau[i]) + FutRew[i] for i in 1:num_trials)
 
-    @NLconstraint(m, 0 <= sum((Reinf*Ur[i]) - Cu[i] - (Cv[i]/RespTau[i]) - (AvRew*RespTau[i]) + FutRew[i] for i in 1:num_trials) <= 0.99)
-    @NLobjective(m, Max, sum((Reinf*Ur[i]) - Cu[i] - (Cv[i]/RespTau[i]) - (AvRew*RespTau[i]) + FutRew[i] for i in 1:num_trials))
+    @NLexpression(m, my_expr[i = 1:num_trials], ((Reinf*Ur[i]) - Cu[i] - (Cv[i]/RespTau[i]) - (((RewSum[i] -Cu[i])/TauSum[i])*RespTau[i]) + FutRew[i]))
+    @NLconstraint(m, my_constr[i = 1:num_trials], 0.1 <= my_expr[i] <= 0.99)
 
     JuMP.optimize!(m)
 
@@ -36,12 +36,119 @@ function optimise(; verbose = true)
     println("RESULTS:")
         for i in 1:num_trials
             println("Objective value: ", JuMP.objective_value(m))
-            println("Ur = ", JuMP.value(Ur))
-            println("Cu = ", JuMP.value(Cu))
-            println("Cv = ", JuMP.value(Cv))
-            println("FutRew = ", JuMP.value(FutRew))
+            println("Ur = ", JuMP.value.(Ur))
+            println("Cu = ", JuMP.value.(Cu))
+            println("Cv = ", JuMP.value.(Cv))
+            println("FutRew = ", JuMP.value.(FutRew))
         end
     end
 end
 
-optimise(verbose=true)
+optimise_response(verbose=true)
+
+
+
+function optimise_collection(; verbose = true)
+    CollTau = CleanData.data.CollLat
+    RewSum = CleanData.data.RewSum
+    Reinf = CleanData.data.Reinf[1]
+    TauSum = CleanData.data.TauSum
+    #AvRew = 0.05
+    num_trials = length(CollTau)
+
+    m = Model(with_optimizer(Ipopt.Optimizer))
+
+    @variable(m, 0.1 <= Ur[1:num_trials]<= 3)
+    @variable(m, 0.01 <= Cu[1:num_trials] <= 1)
+    @variable(m, 0.01 <= Cv[1:num_trials] <= 1)
+    @variable(m, 0 <= FutRew[1:num_trials] <= 80) #need to figure out what this is
+
+
+    @NLexpression(m, my_expr[i = 1:num_trials], ((Reinf*Ur[i]) - Cu[i] - (Cv[i]/CollTau[i]) - (((RewSum[i] -Cu[i])/TauSum[i])*CollTau[i]) + FutRew[i]))
+    @NLconstraint(m, my_constr[i = 1:num_trials], 0.1 <= my_expr[i] <= 0.99)
+
+    JuMP.optimize!(m)
+
+    m = JuMP.objective_value(m)
+    Ur = JuMP.value.(Ur)
+    Cu = JuMP.value.(Cu)
+    Cv = JuMP.value.(Cv)
+    FutRew = JuMP.value.(FutRew)
+    return m , Ur, Cu, Cv, FutRew
+end
+
+ m , Ur, Cu, Cv, FutRew = optimise_collection(verbose=false)
+
+
+Q = Vector{Float64}()
+Ur_A = Vector{Float64}()
+Cu_A = Vector{Float64}()
+Cv_A = Vector{Float64}()
+FutRew_A = Vector{Float64}()
+
+
+CollTau = CleanData.data.CollLat
+RewSum = CleanData.data.RewSum
+Reinf = CleanData.data.Reinf[1]
+TauSum = CleanData.data.TauSum
+
+for i in CollTau, j in RewSum, k in TauSum
+            m = Model(with_optimizer(Ipopt.Optimizer))
+
+            @variable(m, 0.1 <= Ur<= 3)
+            @variable(m, 0.01 <= Cu <= 1)
+            @variable(m, 0.01 <= Cv <= 1)
+            @variable(m, 0 <= FutRew <= 80) #need to figure out what this is
+
+            @NLconstraint(m, 0 <= Reinf*Ur - Cu - (Cv/CollTau[i]) - (((RewSum[j] -Cu)/TauSum[k])*CollTau[i]) + FutRew <= 0.99)
+            @NLobjective(m, Max, (Reinf*Ur) - Cu - (Cv/CollTau[i]) - (((RewSum[j] -Cu)/TauSum[k])*CollTau[i]) + FutRew)
+
+            JuMP.optimize!(m)
+
+            push!(Q, JuMP.objective_value(m))
+            push!(Ur_A, JuMP.value.(Ur))
+            push!(Cu_A, JuMP.value.(Cu))
+            push!(Cv_A, JuMP.value.(Cv))
+            push!(FutRew_A, JuMP.value.(FutRew))
+end
+
+
+
+function optimise_response(data)
+
+    m = Model(with_optimizer(Ipopt.Optimizer))
+
+    @variable(m, 0.1 <= Ur<= 3)
+    @variable(m, 0.01 <= Cu<= 1)
+    @variable(m, 0.01 <= Cv <= 1)
+    @variable(m, 1 <= FutRew <= 90) #need to figure out what this is
+
+    @NLconstraint(m, 0 <= Reinf*Ur - Cu - (Cv/RespTau) - (((RewSum -Cu)/TauSum)*RespTau) + FutRew <= 0.99)
+    @NLobjective(m, Max, (Reinf*Ur) - Cu - (Cv/RespTau) - (((RewSum -Cu)/TauSum)*RespTau) + FutRew)
+
+    JuMP.optimize!(m)
+
+    m = JuMP.objective_value(m)
+    Ur = JuMP.value.(Ur)
+    Cu = JuMP.value.(Cu)
+    Cv = JuMP.value.(Cv)
+    FutRew = JuMP.value.(FutRew)
+    return m , Ur, Cu, Cv, FutRew
+end
+
+
+m , Ur, Cu, Cv, FutRew = optimise_response(data)
+
+
+Q = Vector{Float64}()
+Ur_A = Vector{Float64}()
+Cu_A = Vector{Float64}()
+Cv_A = Vector{Float64}()
+FutRew_A = Vector{Float64}()
+
+data = CleanData.data
+for i in 1:size(data, 1)
+    #println(data[i, :])
+    data = data[i,:]
+    optimise_response(data)
+end
