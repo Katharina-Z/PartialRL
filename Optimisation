@@ -5,23 +5,23 @@ using Ipopt
 module CleanData
 include("CleanData")
 using .CleanData
-export data, RewSum, TauSum, Reinf
+export data
 end
 
 
+data = CleanData.data
 
 
-function optimise(Lat, RewSum, Reinf, TauSum)
+function optimise(Lat, RewSum, Reinf, TauSum, V)
 
     q = Model(with_optimizer(Ipopt.Optimizer))
 
     @variable(q, 0.1 <= Ur<= 3)
-    @variable(q, 0.01 <= Cu<= 1)
-    @variable(q, 0.01 <= Cv <= 1)
-    @variable(q, 1 <= FutRew <= 90) #need to figure out what this is
+    @variable(q, 0.01 <= Cu<= 0.1)
+    @variable(q, 0.01 <= Cv <= 0.1)
 
-    @NLconstraint(q, 0 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + FutRew <= 0.99)
-    @NLobjective(q, Max, (Reinf*Ur) - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + FutRew)
+    @NLconstraint(q, 0 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V <= 0.99)
+    @NLobjective(q, Max, (Reinf*Ur) - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V)
 
     JuMP.optimize!(q)
 
@@ -29,13 +29,8 @@ function optimise(Lat, RewSum, Reinf, TauSum)
     Ur = JuMP.value.(Ur)
     Cu = JuMP.value.(Cu)
     Cv = JuMP.value.(Cv)
-    FutRew = JuMP.value.(FutRew)
-    return q , Ur, Cu, Cv, FutRew
+    return q , Ur, Cu, Cv
 end
-
-
-
-data = CleanData.data
 
 
 function optimise_response(data)
@@ -43,44 +38,41 @@ function optimise_response(data)
     Ur_R = Vector{Float64}()
     Cu_R = Vector{Float64}()
     Cv_R = Vector{Float64}()
-    FutRew_R = Vector{Float64}()
         for i in 1:size(data, 1)
             RespLat = data.RespLat[i]
             RewSum = data.RewSum[i]
             Reinf = data.Reinf[i]
             TauSum = data.TauSum[i]
-            optimise(RespLat, RewSum, Reinf, TauSum)
+            V = data.V[i]
+            q, Ur, Cu, Cv = optimise(RespLat, RewSum, Reinf, TauSum, V)
             append!(Q_R, q)
             append!(Ur_R, Ur)
-            append!(Cu_R, Cu)
             append!(Cv_R, Cv)
-            append!(FutRew_R, FutRew)
+            append!(Cu_R, Cu)
         end
-    return  Q_R, Ur_R, Cu_R, Cv_R, FutRew_R
+    return Q_R, Ur_R, Cu_R, Cv_R
 end
 
-Q_R, Ur_R, Cu_R, Cv_R, FutRew_R = optimise_response(data)
-
+Q_R, Ur_R, Cu_R, Cv_R = optimise_response(data)
 
 function optimise_collection(data)
     Q_C = Vector{Float64}()
     Ur_C = Vector{Float64}()
     Cu_C = Vector{Float64}()
     Cv_C = Vector{Float64}()
-    FutRew_C = Vector{Float64}()
         for i in 1:size(data, 1)
             CollLat = data.CollLat[i]
             RewSum = data.RewSum[i]
             Reinf = data.Reinf[i]
             TauSum = data.TauSum[i]
-            optimise(CollLat, RewSum, Reinf, TauSum)
+            V = data.V[i]
+            optimise(CollLat, RewSum, Reinf, TauSum, V)
             append!(Q_C, q)
             append!(Ur_C, Ur)
             append!(Cu_C, Cu)
             append!(Cv_C, Cv)
-            append!(FutRew_C, FutRew)
         end
-    return  Q_C, Ur_C, Cu_C, Cv_C, FutRew_C
+    return Q_C, Ur_C, Cu_C, Cv_C
 end
 
-Q_C, Ur_C, Cu_C, Cv_C, FutRew_C = optimise_collection(data)
+Q_C, Ur_C, Cu_C, Cv_C = optimise_response(data)

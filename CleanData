@@ -2,11 +2,30 @@
 using CSV
 using DataFrames
 using DataFramesMeta
+using Glob
+
+
+for (root, dirs, files) in walkdir("/Users/katharinazuehlsdorff/Documents/Cambridge IfN PhD/PartialRL/Data")
+    #println("Directories in $root")
+    allfiles = []
+    for dir in dirs
+        #println(joinpath(root, dir))
+    end
+    #println("Files in $root")
+    for file in files
+        println(joinpath(root, file))
+        #f = glob("Animal*.csv")
+        append!(allfiles, (root,file))
+    end
+end
 
 data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Animal1.csv", copycols=true)
+
 select!(data, Not(1))
-select!(data, Not(3))
-rename!(data, [:Reinf ,:CR, :CN, :Prem, :Omissions, :Incorrect, :RespLat, :CollLat])
+select!(data, Not(2))
+
+colnames = ["Reinf" ,"CR", "CN", "Prem", "Omissions", "Incorrect", "RespLat", "CollLat"]
+names!(data, Symbol.(colnames))
 
 
 #=
@@ -26,6 +45,8 @@ data[data[!, :Prem] .== 1,:Action] .= Ref(3)
 data[data[!, :Incorrect] .== 1,:Action] .= Ref(4)
 data[data[!, :Omissions] .== 1,:Action] .= Ref(5)
 
+
+
 #response latency for omisssion not included
 #if collection latency 0, interpret as NaN
 #exclude collection latencies for premature, omissions and incorrect
@@ -33,7 +54,7 @@ data[data[!, :Omissions] .== 1,:Action] .= Ref(5)
 data.Tau = data.RespLat + data.CollLat
 
 
-data.RewSum = data.CR
+data.RewSum = data[:, :CR]
 
 for (i,v) in enumerate(data.RewSum)
     if i > 1
@@ -42,7 +63,7 @@ for (i,v) in enumerate(data.RewSum)
 end
 
 
-data.TauSum = data.Tau
+data.TauSum = data[:, :Tau]
 
 for (i,v) in enumerate(data.TauSum)
     if i > 1
@@ -50,8 +71,14 @@ for (i,v) in enumerate(data.TauSum)
     end
 end
 
-data.Reinf = data.Reinf / 100
+data.R = data[:,:CR]
 
-RewSum = data.RewSum
-TauSum = data.TauSum
-Reinf = data.Reinf
+data.V = 0
+for (i,v) in enumerate(data.V)
+    if i > 1
+        data.V[i] = data.R[i] - data.V[i-1]
+    end
+end
+
+
+data.Reinf = data.Reinf / 100
