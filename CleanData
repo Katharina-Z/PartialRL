@@ -3,82 +3,74 @@ using CSV
 using DataFrames
 using DataFramesMeta
 using Glob
+using CSVFiles, DataTables
 
 
-for (root, dirs, files) in walkdir("/Users/katharinazuehlsdorff/Documents/Cambridge IfN PhD/PartialRL/Data")
-    #println("Directories in $root")
-    allfiles = []
-    for dir in dirs
-        #println(joinpath(root, dir))
+data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Data/rr50/mergedrr50.csv", copycols=true)
+
+function clean(data)
+
+    colnames = ["Rat", "Reinf", "Trial", "CR", "CN", "Prem", "Omissions", "Incorrect", "RespLat", "CollLat"]
+    names!(data, Symbol.(colnames))
+
+
+    #=
+
+    Possible actions:
+    Nose poke to light & receive reward (NPR = 1)
+    Nose pose to light, correct & no reward (NPNR = 2)
+    Nose poke to light but incorrect, no reward (NPiNR = 3)
+    Nose poke to light but premature, no reward (NPpNR)
+    Omission (O = 5)
+    =#
+
+    #The value in the sequence will be 1 when
+    data.Action = 0
+    data[data[!, :CR] .== 1,:Action] .= Ref(1)
+    data[data[!,:CN] .== 1,:Action] .= Ref(2)
+    data[data[!, :Prem] .== 1,:Action] .= Ref(3)
+    data[data[!, :Incorrect] .== 1,:Action] .= Ref(4)
+    data[data[!, :Omissions] .== 1,:Action] .= Ref(5)
+
+
+
+    #response latency for omisssion not included
+    #if collection latency 0, interpret as NaN
+    #exclude collection latencies for premature, omissions and incorrect
+
+    data.Tau = data.RespLat + data.CollLat
+
+
+    data.RewSum = data[:, :CR]
+
+    for (i,v) in enumerate(data.RewSum)
+        if i > 1
+            data.RewSum[i] = data.RewSum[i] + data.RewSum[i-1]
+        end
     end
-    #println("Files in $root")
-    for file in files
-        println(joinpath(root, file))
-        #f = glob("Animal*.csv")
-        append!(allfiles, (root,file))
+
+
+    data.TauSum = data[:, :Tau]
+
+    for (i,v) in enumerate(data.TauSum)
+        if i > 1
+            data.TauSum[i] = data.TauSum[i] + data.TauSum[i-1]
+        end
     end
+
+
+    data.Pr = 0
+    for (i,v) in enumerate(data.Action)
+        if v == 1 || v == 2
+            data.Pr[i] = data.Reinf[i]
+        end
+
+    end
+
+
+    data.Pr = data.Pr/100
+    data.Reinf = data.Reinf/100
+    return data
 end
 
-data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Animal1.csv", copycols=true)
-
-select!(data, Not(1))
-select!(data, Not(2))
-
-colnames = ["Reinf" ,"CR", "CN", "Prem", "Omissions", "Incorrect", "RespLat", "CollLat"]
-names!(data, Symbol.(colnames))
-
-
-#=
-Possible actions:
-Nose poke to light & receive reward (NPR = 1)
-Nose pose to light, correct & no reward (NPNR = 2)
-Nose poke to light but incorrect, no reward (NPiNR = 3)
-Nose poke to light but premature, no reward (NPpNR)
-Omission (O = 5)
-=#
-
-#The value in the sequence will be 1 when
-data.Action = 0
-data[data[!, :CR] .== 1,:Action] .= Ref(1)
-data[data[!,:CN] .== 1,:Action] .= Ref(2)
-data[data[!, :Prem] .== 1,:Action] .= Ref(3)
-data[data[!, :Incorrect] .== 1,:Action] .= Ref(4)
-data[data[!, :Omissions] .== 1,:Action] .= Ref(5)
-
-
-
-#response latency for omisssion not included
-#if collection latency 0, interpret as NaN
-#exclude collection latencies for premature, omissions and incorrect
-
-data.Tau = data.RespLat + data.CollLat
-
-
-data.RewSum = data[:, :CR]
-
-for (i,v) in enumerate(data.RewSum)
-    if i > 1
-        data.RewSum[i] = data.RewSum[i] + data.RewSum[i-1]
-    end
-end
-
-
-data.TauSum = data[:, :Tau]
-
-for (i,v) in enumerate(data.TauSum)
-    if i > 1
-        data.TauSum[i] = data.TauSum[i] + data.TauSum[i-1]
-    end
-end
-
-data.R = data[:,:CR]
-
-data.V = 0
-for (i,v) in enumerate(data.V)
-    if i > 1
-        data.V[i] = data.R[i] - data.V[i-1]
-    end
-end
-
-
-data.Reinf = data.Reinf / 100
+clean(data)

@@ -2,6 +2,7 @@ using JuMP
 using Ipopt
 
 
+
 module CleanData
 include("CleanData")
 using .CleanData
@@ -20,7 +21,7 @@ function optimise(Lat, RewSum, Reinf, TauSum, V)
     @variable(q, 0.01 <= Cu<= 0.1)
     @variable(q, 0.01 <= Cv <= 0.1)
 
-    @NLconstraint(q, 0 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V <= 0.99)
+    @NLconstraint(q, 0 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V <= 1)
     @NLobjective(q, Max, (Reinf*Ur) - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V)
 
     JuMP.optimize!(q)
@@ -41,9 +42,9 @@ function optimise_response(data)
         for i in 1:size(data, 1)
             RespLat = data.RespLat[i]
             RewSum = data.RewSum[i]
-            Reinf = data.Reinf[i]
+            Reinf = data.Pr[i]
             TauSum = data.TauSum[i]
-            V = data.V[i]
+            V = data.Pr[i]
             q, Ur, Cu, Cv = optimise(RespLat, RewSum, Reinf, TauSum, V)
             append!(Q_R, q)
             append!(Ur_R, Ur)
@@ -55,6 +56,8 @@ end
 
 Q_R, Ur_R, Cu_R, Cv_R = optimise_response(data)
 
+
+
 function optimise_collection(data)
     Q_C = Vector{Float64}()
     Ur_C = Vector{Float64}()
@@ -63,10 +66,10 @@ function optimise_collection(data)
         for i in 1:size(data, 1)
             CollLat = data.CollLat[i]
             RewSum = data.RewSum[i]
-            Reinf = data.Reinf[i]
+            Reinf = data.Pr[i]
             TauSum = data.TauSum[i]
-            V = data.V[i]
-            optimise(CollLat, RewSum, Reinf, TauSum, V)
+            V = data.Pr[i]
+            q, Ur, Cu, Cv = optimise(CollLat, RewSum, Reinf, TauSum, V)
             append!(Q_C, q)
             append!(Ur_C, Ur)
             append!(Cu_C, Cu)
@@ -75,4 +78,16 @@ function optimise_collection(data)
     return Q_C, Ur_C, Cu_C, Cv_C
 end
 
-Q_C, Ur_C, Cu_C, Cv_C = optimise_response(data)
+Q_C, Ur_C, Cu_C, Cv_C = optimise_collection(data)
+
+Resp = hcat(data.Rat, data.Reinf, data.CR, data.Trial, data.Action, Q_R, Ur_R, Cu_R, Cv_R)
+Resp = convert(DataFrame, Resp)
+colnames = ["Rat", "Reinf", "Reward", "Trial", "Action","Q", "Ur", "Cu", "Cv"]
+names!(Resp, Symbol.(colnames))
+
+
+
+Coll = hcat(data.Rat, data.Reinf, data.CR, data.Trial, data.Action, Q_C, Ur_C, Cu_C, Cv_C)
+Coll = convert(DataFrame, Coll)
+colnames = ["Rat", "Reinf", "Reward", "Trial", "Action","Q", "Ur", "Cu", "Cv"]
+names!(Coll, Symbol.(colnames))
