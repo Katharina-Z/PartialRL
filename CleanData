@@ -6,7 +6,7 @@ using Glob
 using CSVFiles, DataTables
 
 
-data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Data/rr50/mergedrr50.csv", copycols=true)
+data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Data/rr100/mergedrr100.csv", copycols=true)
 
 function clean(data)
 
@@ -64,7 +64,6 @@ function clean(data)
         if v == 1 || v == 2
             data.Pr[i] = data.Reinf[i]
         end
-
     end
 
 

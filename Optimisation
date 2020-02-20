@@ -1,6 +1,6 @@
 using JuMP
 using Ipopt
-
+using CSV
 
 
 module CleanData
@@ -17,11 +17,11 @@ function optimise(Lat, RewSum, Reinf, TauSum, V)
 
     q = Model(with_optimizer(Ipopt.Optimizer))
 
-    @variable(q, 0.1 <= Ur<= 3)
+    @variable(q, 0.1 <= Ur<= 2)
     @variable(q, 0.01 <= Cu<= 0.1)
     @variable(q, 0.01 <= Cv <= 0.1)
 
-    @NLconstraint(q, 0 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V <= 1)
+    @NLconstraint(q, -1 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V <= 1)
     @NLobjective(q, Max, (Reinf*Ur) - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V)
 
     JuMP.optimize!(q)
@@ -91,3 +91,10 @@ Coll = hcat(data.Rat, data.Reinf, data.CR, data.Trial, data.Action, Q_C, Ur_C, C
 Coll = convert(DataFrame, Coll)
 colnames = ["Rat", "Reinf", "Reward", "Trial", "Action","Q", "Ur", "Cu", "Cv"]
 names!(Coll, Symbol.(colnames))
+
+
+CSV.write("Resp_rr100.csv",Resp)
+CSV.write("Coll_rr100.csv",Coll)
+
+
+#Rat10 = Coll[(Coll[:Rat] .==10),:]
