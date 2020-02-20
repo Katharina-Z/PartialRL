@@ -1,4 +1,4 @@
 # PartialRL
-Modelling behavioural rat data to identify whether subjective utility differs for different impulsivity groups in rats on different reinforcement learning schedules (0%, 20%, 40%, 60%, 80%, 100%).
+Fitting a Q-learning model to rat behavioural data to identify whether subjective utility, unit cost and vigour cost differ for different impulsivity groups in rats on various reinforcement learning schedules (0%, 20%, 40%, 60%, 80%, 100%).
 
-Using JuMP (Julia) to identify the values of each action as well as identifying subjective utility, unit cost and vigour cost. This is  done with temporal difference learning.
+Using JuMP (Julia) for nonlinear mathematical optimisation.
