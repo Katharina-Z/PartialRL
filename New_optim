@@ -1,0 +1,54 @@
+using JuMP
+using Ipopt
+using CSV
+
+
+
+
+Q_R = Vector{Float64}()
+Ur_R = Vector{Float64}()
+Cu_R = Vector{Float64}()
+Cv_R = Vector{Float64}()
+
+i=1
+RespLat = data.RespLat[i]
+RewSum = data.RewSum[i]
+Reinf = data.Pr[i]
+TauSum = data.TauSum[i]
+V = 0
+
+
+q = Model(with_optimizer(Ipopt.Optimizer))
+
+@variable(q, 0.1 <= Ur<= 2)
+@variable(q, 0.01 <= Cu<= 0.1)
+@variable(q, 0.01 <= Cv <= 0.1)
+
+
+@NLconstraint(q, -1 <= Reinf*Ur - Cu - (Cv/RespLat) - (((RewSum -Cu)/TauSum)*RespLat) + V <= 1)
+@NLobjective(q, Max, (Reinf*Ur) - Cu - (Cv/RespLat) - (((RewSum -Cu)/TauSum)*RespLat) + V)
+
+JuMP.optimize!(q)
+
+q = JuMP.objective_value(q)
+Ur = JuMP.value.(Ur)
+Cu = JuMP.value.(Cu)
+Cv = JuMP.value.(Cv)
+
+
+dataset("cars") |>
+@vlplot(
+    :point,
+    x=:Horsepower,
+    y=:Miles_per_Gallon,
+    color=:Origin,
+    width=400,
+    height=400
+)
+
+
+append!(Q_C, 0)
+append!(Q_C, q)
+append!(Ur_C, Ur)
+append!(Cv_C, Cv)
+append!(Cu_C, Cu)
