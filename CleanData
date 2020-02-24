@@ -1,18 +1,12 @@
-
 using CSV
 using DataFrames
 using DataFramesMeta
 using Glob
-using CSVFiles, DataTables
 
 
-data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Data/rr100/mergedrr100.csv", copycols=true)
+data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Data/rr50/mergedrr50.csv", copycols=true, header=["Rat", "Reinf", "Trial", "CR", "CN", "Prem", "Omissions", "Incorrect", "RespLat", "CollLat"], datarow=1)
 
 function clean(data)
-
-    colnames = ["Rat", "Reinf", "Trial", "CR", "CN", "Prem", "Omissions", "Incorrect", "RespLat", "CollLat"]
-    names!(data, Symbol.(colnames))
-
 
     #=
 
@@ -40,29 +34,16 @@ function clean(data)
 
     data.Tau = data.RespLat + data.CollLat
 
-
     data.RewSum = data[:, :CR]
 
-    for (i,v) in enumerate(data.RewSum)
-        if i > 1
-            data.RewSum[i] = data.RewSum[i] + data.RewSum[i-1]
-        end
-    end
-
-
     data.TauSum = data[:, :Tau]
-
-    for (i,v) in enumerate(data.TauSum)
-        if i > 1
-            data.TauSum[i] = data.TauSum[i] + data.TauSum[i-1]
-        end
-    end
-
 
     data.Pr = 0
     for (i,v) in enumerate(data.Action)
         if v == 1 || v == 2
             data.Pr[i] = data.Reinf[i]
+        #elseif v == 3
+            #data.Pr[i] =
         end
     end
 
@@ -73,3 +54,28 @@ function clean(data)
 end
 
 clean(data)
+
+
+
+grouped = groupby(data, [:Rat])
+
+
+
+for group in grouped
+
+    for (i,v) in enumerate(group.RewSum)
+        if i > 1
+            group.RewSum[i] = group.RewSum[i] + group.RewSum[i-1]
+        end
+    end
+
+
+    for (i,v) in enumerate(group.TauSum)
+        if i > 1
+            group.TauSum[i] = group.TauSum[i] + group.TauSum[i-1]
+        end
+    end
+
+end
+
+newdata = DataFrame(grouped)

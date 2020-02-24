@@ -2,7 +2,6 @@ using JuMP
 using Ipopt
 using CSV
 
-
 module CleanData
 include("CleanData")
 using .CleanData
@@ -10,32 +9,32 @@ export data
 end
 
 
-data = CleanData.data
+data = CleanData.newdata
 
 
-function optimise(Lat, RewSum, Reinf, TauSum, V)
+function optimise(Lat, RewSum, Reinf, TauSum, Fut)
 
-    q = Model(with_optimizer(Ipopt.Optimizer))
+    V = Model(with_optimizer(Ipopt.Optimizer))
 
-    @variable(q, 0.1 <= Ur<= 2)
-    @variable(q, 0.01 <= Cu<= 0.1)
-    @variable(q, 0.01 <= Cv <= 0.1)
+    @variable(V, 0.1 <= Ur<= 2)
+    @variable(V, 0.01 <= Cu<= 0.1)
+    @variable(V, 10 <= Cv <= 100) #i n paper, it's 0.01
 
-    @NLconstraint(q, -1 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V <= 1)
-    @NLobjective(q, Max, (Reinf*Ur) - Cu - (Cv/Lat) - (((RewSum -Cu)/TauSum)*Lat) + V)
+    @NLconstraint(V, -1 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum + Cu)/TauSum)*Lat) +Fut <= 1)
+    @NLobjective(V, Max, (Reinf*Ur) - Cu - (Cv/Lat) - (((RewSum + Cu)/TauSum)*Lat) + Fut)
 
-    JuMP.optimize!(q)
+    JuMP.optimize!(V)
 
-    q = JuMP.objective_value(q)
+    V= JuMP.objective_value(V)
     Ur = JuMP.value.(Ur)
     Cu = JuMP.value.(Cu)
     Cv = JuMP.value.(Cv)
-    return q , Ur, Cu, Cv
+    return V , Ur, Cu, Cv
 end
 
 
 function optimise_response(data)
-    Q_R = Vector{Float64}()
+    V_R = Vector{Float64}()
     Ur_R = Vector{Float64}()
     Cu_R = Vector{Float64}()
     Cv_R = Vector{Float64}()
@@ -44,22 +43,23 @@ function optimise_response(data)
             RewSum = data.RewSum[i]
             Reinf = data.Pr[i]
             TauSum = data.TauSum[i]
-            V = data.Pr[i]
-            q, Ur, Cu, Cv = optimise(RespLat, RewSum, Reinf, TauSum, V)
-            append!(Q_R, q)
+            Fut = data.Pr[i]
+            V, Ur, Cu, Cv = optimise(RespLat, RewSum, Reinf, TauSum, Fut)
+            append!(V_R, V)
             append!(Ur_R, Ur)
             append!(Cv_R, Cv)
             append!(Cu_R, Cu)
         end
-    return Q_R, Ur_R, Cu_R, Cv_R
+    return V_R, Ur_R, Cu_R, Cv_R
 end
 
-Q_R, Ur_R, Cu_R, Cv_R = optimise_response(data)
+
+V_R, Ur_R, Cu_R, Cv_R = optimise_response(data)
 
 
 
 function optimise_collection(data)
-    Q_C = Vector{Float64}()
+    V_C = Vector{Float64}()
     Ur_C = Vector{Float64}()
     Cu_C = Vector{Float64}()
     Cv_C = Vector{Float64}()
@@ -68,33 +68,38 @@ function optimise_collection(data)
             RewSum = data.RewSum[i]
             Reinf = data.Pr[i]
             TauSum = data.TauSum[i]
-            V = data.Pr[i]
-            q, Ur, Cu, Cv = optimise(CollLat, RewSum, Reinf, TauSum, V)
-            append!(Q_C, q)
+            Fut = data.Pr[i]
+            V, Ur, Cu, Cv = optimise(CollLat, RewSum, Reinf, TauSum, Fut)
+            append!(V_C, V)
             append!(Ur_C, Ur)
             append!(Cu_C, Cu)
             append!(Cv_C, Cv)
         end
-    return Q_C, Ur_C, Cu_C, Cv_C
+    return V_C, Ur_C, Cu_C, Cv_C
 end
 
-Q_C, Ur_C, Cu_C, Cv_C = optimise_collection(data)
 
-Resp = hcat(data.Rat, data.Reinf, data.CR, data.Trial, data.Action, Q_R, Ur_R, Cu_R, Cv_R)
+V_C, Ur_C, Cu_C, Cv_C = optimise_collection(data)
+
+
+
+
+
+
+Resp = hcat(data.Rat, data.Reinf, data.CR, data.Trial, data.Action, V_R, Ur_R, Cu_R, Cv_R)
 Resp = convert(DataFrame, Resp)
-colnames = ["Rat", "Reinf", "Reward", "Trial", "Action","Q", "Ur", "Cu", "Cv"]
+colnames = ["Rat", "Reinf", "Reward", "Trial", "Action","V", "Ur", "Cu", "Cv"]
 names!(Resp, Symbol.(colnames))
 
 
 
-Coll = hcat(data.Rat, data.Reinf, data.CR, data.Trial, data.Action, Q_C, Ur_C, Cu_C, Cv_C)
+Coll = hcat(data.Rat, data.Reinf, data.CR, data.Trial, data.Action, V_C, Ur_C, Cu_C, Cv_C)
 Coll = convert(DataFrame, Coll)
-colnames = ["Rat", "Reinf", "Reward", "Trial", "Action","Q", "Ur", "Cu", "Cv"]
+colnames = ["Rat", "Reinf", "Reward", "Trial", "Action","V", "Ur", "Cu", "Cv"]
 names!(Coll, Symbol.(colnames))
 
 
-CSV.write("Resp_rr100.csv",Resp)
-CSV.write("Coll_rr100.csv",Coll)
 
 
-#Rat10 = Coll[(Coll[:Rat] .==10),:]
+CSV.write("Resp_rr20.csv",Resp)
+CSV.write("Coll_rr20.csv",Coll)
