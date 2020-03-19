@@ -4,7 +4,7 @@ using DataFramesMeta
 using Glob
 
 
-data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Data/rr50/mergedrr50.csv", copycols=true, header=["Rat", "Reinf", "Trial", "CR", "CN", "Prem", "Omissions", "Incorrect", "RespLat", "CollLat"], datarow=1)
+data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Data/rr80/mergedrr80.csv", copycols=true, header=["Rat", "Reinf", "Trial", "CR", "CN", "Prem", "Omissions", "Incorrect", "RespLat", "CollLat"], datarow=1)
 
 function clean(data)
 
@@ -21,10 +21,10 @@ function clean(data)
     #The value in the sequence will be 1 when
     data.Action = 0
     data[data[!, :CR] .== 1,:Action] .= Ref(1)
-    data[data[!,:CN] .== 1,:Action] .= Ref(2)
-    data[data[!, :Prem] .== 1,:Action] .= Ref(3)
-    data[data[!, :Incorrect] .== 1,:Action] .= Ref(4)
-    data[data[!, :Omissions] .== 1,:Action] .= Ref(5)
+    data[data[!,:CN] .== 1,:Action] .= Ref(1)
+    data[data[!, :Incorrect] .== 1,:Action] .= Ref(1)
+    data[data[!, :Prem] .== 1,:Action] .= Ref(1)
+    data[data[!, :Omissions] .== 1,:Action] .= Ref(2)
 
 
 
@@ -32,11 +32,6 @@ function clean(data)
     #if collection latency 0, interpret as NaN
     #exclude collection latencies for premature, omissions and incorrect
 
-    data.Tau = data.RespLat + data.CollLat
-
-    data.RewSum = data[:, :CR]
-
-    data.TauSum = data[:, :Tau]
 
     data.Pr = 0
     for (i,v) in enumerate(data.Action)
@@ -50,6 +45,11 @@ function clean(data)
 
     data.Pr = data.Pr/100
     data.Reinf = data.Reinf/100
+    data.RespLat = data.RespLat/1000
+    data.CollLat = data.CollLat/1000
+    data.Tau = data.RespLat + data.CollLat
+    data.TauSum = data[:, :Tau]
+    data.RewSum = data[:, :CR]
     return data
 end
 

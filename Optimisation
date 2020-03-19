@@ -1,6 +1,7 @@
 using JuMP
 using Ipopt
 using CSV
+using DataFrames
 
 module CleanData
 include("CleanData")
@@ -9,19 +10,20 @@ export data
 end
 
 
-data = CleanData.newdata
+newdata = CleanData.newdata
 
 
-function optimise(Lat, RewSum, Reinf, TauSum, Fut)
+
+function optimise(Lat, RewSum, Reinf, TauSum)
 
     V = Model(with_optimizer(Ipopt.Optimizer))
 
     @variable(V, 0.1 <= Ur<= 2)
-    @variable(V, 0.01 <= Cu<= 0.1)
-    @variable(V, 10 <= Cv <= 100) #i n paper, it's 0.01
+    @variable(V, -0.02 <= Cu<= 0.02)
+    @variable(V, 0.001 <= Cv <= 0.02) #in paper, it's 0.01
 
-    @NLconstraint(V, -1 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum + Cu)/TauSum)*Lat) +Fut <= 1)
-    @NLobjective(V, Max, (Reinf*Ur) - Cu - (Cv/Lat) - (((RewSum + Cu)/TauSum)*Lat) + Fut)
+    @NLconstraint(V, -2 <= Reinf*Ur - Cu - (Cv/Lat) - (((RewSum+Cu)/TauSum)*Lat) <= 2)
+    @NLobjective(V, Max, (Reinf*Ur) - Cu - (Cv/Lat) - (((RewSum+Cu)/TauSum)*Lat))
 
     JuMP.optimize!(V)
 
@@ -43,8 +45,7 @@ function optimise_response(data)
             RewSum = data.RewSum[i]
             Reinf = data.Pr[i]
             TauSum = data.TauSum[i]
-            Fut = data.Pr[i]
-            V, Ur, Cu, Cv = optimise(RespLat, RewSum, Reinf, TauSum, Fut)
+            V, Ur, Cu, Cv = optimise(RespLat, RewSum, Reinf, TauSum)
             append!(V_R, V)
             append!(Ur_R, Ur)
             append!(Cv_R, Cv)
@@ -66,10 +67,9 @@ function optimise_collection(data)
         for i in 1:size(data, 1)
             CollLat = data.CollLat[i]
             RewSum = data.RewSum[i]
-            Reinf = data.Pr[i]
+            Reinf = data.CR[i]
             TauSum = data.TauSum[i]
-            Fut = data.Pr[i]
-            V, Ur, Cu, Cv = optimise(CollLat, RewSum, Reinf, TauSum, Fut)
+            V, Ur, Cu, Cv = optimise(CollLat, RewSum, Reinf, TauSum)
             append!(V_C, V)
             append!(Ur_C, Ur)
             append!(Cu_C, Cu)
@@ -80,7 +80,6 @@ end
 
 
 V_C, Ur_C, Cu_C, Cv_C = optimise_collection(data)
-
 
 
 
@@ -101,5 +100,5 @@ names!(Coll, Symbol.(colnames))
 
 
 
-CSV.write("Resp_rr20.csv",Resp)
-CSV.write("Coll_rr20.csv",Coll)
+CSV.write("RR80/Resp_rr80.csv",Resp)
+CSV.write("RR80/Coll_rr80.csv",Coll)
