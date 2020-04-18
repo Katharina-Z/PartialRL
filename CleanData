@@ -4,7 +4,7 @@ using DataFramesMeta
 using Glob
 
 
-data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Data/rr80/mergedrr80.csv", copycols=true, header=["Rat", "Reinf", "Trial", "CR", "CN", "Prem", "Omissions", "Incorrect", "RespLat", "CollLat"], datarow=1)
+data = CSV.read("/Users/katharinazuehlsdorff/PartialRL/Data/rr20/mergedrr0.csv", copycols=true, header=["Rat", "Reinf", "Trial", "CR", "CN", "Prem", "Omissions", "Incorrect", "RespLat", "CollLat"], datarow=1)
 
 function clean(data)
 
